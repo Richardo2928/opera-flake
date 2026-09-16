@@ -53,7 +53,7 @@ stdenv.mkDerivation (finalAttrs: {
   src = fetchurl {
     #url = "${"https://get.geo.opera.com/pub/opera/desktop"}/${finalAttrs.version}/linux/opera-stable_${finalAttrs.version}_amd64.deb";
     url = "https://download3.operacdn.com/ftp/pub/opera/desktop/${finalAttrs.version}/linux/opera-stable_${finalAttrs.version}_amd64.deb";
-    hash = "";
+    hash = "sha256-W+bKm4Pnrn2TY0VKtn/O+8R9IyqGtMXwh9K9+rJpIJg=";
   };
   nativeBuildInputs = [
     dpkg
