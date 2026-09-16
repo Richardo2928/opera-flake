@@ -23,8 +23,8 @@ jobs:
       - name: Run updater
         if: steps.check.outputs.update_needed == 'true'
         run: |
-          chmod +x update.sh
-          ./update.sh
+          chmod +x scripts/update.sh
+          ./scripts/update.sh
 
       - name: Commit
         if: steps.check.outputs.update_needed == 'true'
