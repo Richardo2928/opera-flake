@@ -20,6 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+
       - name: Check if update is needed
         id: check
         run: |
@@ -35,7 +38,7 @@ jobs:
           ./scripts/update.sh
 
       - name: Commit
-        if: steps.check.outputs.update_needed == 'true'
+        if: steps.check.outputs.update_needed == 'true'  || inputs.force_update == true
         run: |
           if grep -Eq 'hash = ""|hash = "sha256-AAAAAAAA|hash = "null"' one.nix gx.nix; then
             echo "::error::Invalid hash detected in one.nix or gx.nix. Aborting commit to prevent corruption."
