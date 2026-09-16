@@ -43,7 +43,7 @@ get_nix_hash() {
   info "Downloading and calculating hash for: $url" >&2
   local raw_hash
   raw_hash=$(nix-prefetch-url --type sha256 "$url")
-  nix hash to-sri --type sha256 "$raw_hash"
+  nix hash convert --hash-algo sha256 --to sri "$raw_hash"
 }
 
 # ==========================================
