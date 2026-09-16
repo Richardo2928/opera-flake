@@ -40,7 +40,7 @@ update_nix_file() {
 # ==========================================
 get_nix_hash() {
   local url="$1"
-  info "Downloading and calculating hash for: $url"
+  info "Downloading and calculating hash for: $url" >&2
   local raw_hash
   raw_hash=$(nix-prefetch-url --type sha256 "$url")
   nix hash to-sri --type sha256 "$raw_hash"
