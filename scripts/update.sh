@@ -137,16 +137,16 @@ main() {
   info "Current Opera GX version:     $current_gx (hash: ${gx_hash:-EMPTY})"
 
   if ! is_valid_hash "$stable_hash"; then
-    warn "🚨 Invalid hash detected in one.nix. Forcing update."
+    warn "Invalid hash detected in one.nix. Forcing update."
     force_update="true"
   fi
   if ! is_valid_hash "$gx_hash"; then
-    warn "🚨 Invalid hash detected in gx.nix. Forcing update."
+    warn "Invalid hash detected in gx.nix. Forcing update."
     force_update="true"
   fi
 
   if [[ "$force_update" == "true" ]]; then
-    info "🔧 Update manually forced."
+    info "Update manually forced."
     update_needed="true"
     latest_stable="$current_stable"
     latest_gx="$current_gx"
@@ -178,11 +178,11 @@ main() {
   fi
 
   if [[ "$update_needed" != "true" ]]; then
-    info "✅ No version changes"
+    info "No version changes"
     return 0
   fi
 
-  info "✅ New version or broken hash found: updating .nix files"
+  info "New version or broken hash found: updating .nix files"
 
   if [[ "$latest_stable" != "$current_stable" || "$force_update" == "true" ]]; then
     local stable_url="${stable_base}${latest_stable}/linux/opera-stable_${latest_stable}_amd64.deb"
@@ -198,7 +198,7 @@ main() {
     update_nix_file "gx.nix" "$latest_gx" "$gx_new_hash"
   fi
 
-  info "🎉 Update completed."
+  info "Update completed."
 }
 
 main "$@"

@@ -29,7 +29,7 @@ jobs:
           FORCE_UPDATE: ${{ github.event.inputs.force_update || 'false' }}
 
       - name: Run updater
-        if: steps.check.outputs.update_needed == 'true'
+        if: steps.check.outputs.update_needed == 'true' || inputs.force_update == true
         run: |
           chmod +x scripts/update.sh
           ./scripts/update.sh
