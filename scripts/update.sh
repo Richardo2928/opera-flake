@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
-# update.sh v1.0.2 (Definitive Version)
+# update.sh v1.0.3
 
-# 1. strict mode: fail on errors, unset variables, or pipeline failures
 set -euo pipefail
 
 info() { echo -e "\e[32m[INFO]\e[0m $*"; }
 warn() { echo -e "\e[33m[WARN]\e[0m $*"; }
 
-# 2. Hash security validation
+# ==========================================
+# Hash validation
+# ==========================================
 is_valid_sri() {
   [[ "${1:-}" =~ ^sha256-[A-Za-z0-9+/=]+$ ]]
 }
 
-# 3. Safely update the .nix file
+is_valid_hash() {
+  is_valid_sri "${1:-}"
+}
+
+# ==========================================
+# Update the .nix file
+# ==========================================
 update_nix_file() {
   local file="$1"
   local version="$2"
@@ -22,14 +29,15 @@ update_nix_file() {
   [[ -n "${hash:-}" ]] || { echo "::error::Empty hash"; exit 1; }
   is_valid_sri "$hash" || { echo "::error::Invalid hash detected: $hash"; exit 1; }
 
-  # Robust sed commands that preserve the original spacing and format
   sed -Ei "s|^([[:space:]]*version[[:space:]]*=[[:space:]]*\").*(\";[[:space:]]*)$|\1${version}\2|" "$file"
   sed -Ei "s|^([[:space:]]*hash[[:space:]]*=[[:space:]]*\").*(\";[[:space:]]*)$|\1${hash}\2|" "$file"
-  
+
   info "$file updated to v${version}"
 }
 
-# 4. Get the Nix hash
+# ==========================================
+# Get the Nix hash
+# ==========================================
 get_nix_hash() {
   local url="$1"
   info "Downloading and calculating hash for: $url"
@@ -39,32 +47,158 @@ get_nix_hash() {
 }
 
 # ==========================================
-# 5. Main logic: Opera Stable
+# Read the current version/hash from the .nix file
 # ==========================================
-info "Looking for an update for Opera Stable..."
-STABLE_BASE="https://download3.operacdn.com/ftp/pub/opera/desktop/"
+get_current_version_from_nix() {
+  local file="$1"
+  grep -Eo 'version\s*=\s*"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"' "$file" \
+    | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' \
+    | head -n1
+}
 
-# Get versions sorted from highest to lowest
-mapfile -t STABLE_VERSIONS < <(curl -fsSL "$STABLE_BASE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | sort -V -r)
+get_current_hash_from_nix() {
+  local file="$1"
+  grep -Eo 'hash\s*=\s*"[^"]+"' "$file" \
+    | grep -Eo '"[^"]+"' \
+    | tr -d '"' \
+    | head -n1
+}
 
-for OPERA_VERSION in "${STABLE_VERSIONS[@]}"; do
-  OPERA_URL="${STABLE_BASE}${OPERA_VERSION}/linux/opera-stable_${OPERA_VERSION}_amd64.deb"
-  
-  # Check whether the file exists (HTTP 200) without downloading it
-  STATUS=$(curl -fsSL -o /dev/null -w "%{http_code}" "$OPERA_URL" || true)
-  
-  if [[ "$STATUS" == "200" ]]; then
-    info "Found valid version: $OPERA_VERSION"
-    OPERA_HASH=$(get_nix_hash "$OPERA_URL")
-    update_nix_file "one.nix" "$OPERA_VERSION" "$OPERA_HASH"
-    break # Exit the loop after finding the first valid version
-  else
-    warn "Version $OPERA_VERSION has no Linux .deb (HTTP $STATUS). Trying the previous version..."
+# ==========================================
+# List versions from the CDN
+# ==========================================
+get_all_versions() {
+  local base="$1"
+  curl -fsSL "$base" \
+    | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' \
+    | sort -Vu \
+    | sort -Vr
+}
+
+# ==========================================
+# Check whether a URL exists
+# ==========================================
+url_exists() {
+  local url="$1"
+  local status
+  status="$(curl -fsSL -o /dev/null -w "%{http_code}" "$url" || true)"
+  [[ "$status" == "200" ]]
+}
+
+# ==========================================
+# Get the first valid version
+# ==========================================
+get_latest_valid_version() {
+  local base="$1"
+  local kind="$2"
+  local v deb
+
+  while read -r v; do
+    [[ -z "$v" ]] && continue
+    if [[ "$kind" == "stable" ]]; then
+      deb="${base}${v}/linux/opera-stable_${v}_amd64.deb"
+    else
+      deb="${base}${v}/linux/opera-gx-stable_${v}_amd64.deb"
+    fi
+
+    if url_exists "$deb"; then
+      echo "$v"
+      return 0
+    else
+      warn "Discarding $v (no valid Linux .deb)"
+    fi
+  done < <(get_all_versions "$base")
+
+  return 1
+}
+
+# ==========================================
+# Main
+# ==========================================
+main() {
+  local stable_base="https://download3.operacdn.com/ftp/pub/opera/desktop/"
+  local gx_base="https://download3.operacdn.com/ftp/pub/opera_gx/"
+
+  local current_stable current_gx latest_stable latest_gx update_needed
+  local stable_hash gx_hash
+  local force_update="${FORCE_UPDATE:-false}"
+
+  current_stable="$(get_current_version_from_nix one.nix || true)"
+  current_gx="$(get_current_version_from_nix gx.nix || true)"
+  stable_hash="$(get_current_hash_from_nix one.nix || true)"
+  gx_hash="$(get_current_hash_from_nix gx.nix || true)"
+
+  if [[ -z "${current_stable:-}" || -z "${current_gx:-}" ]]; then
+    echo "Could not read the current version from one.nix/gx.nix" >&2
+    exit 1
   fi
-done
 
-# ==========================================
-# 6. Main logic: Opera GX
-# ==========================================
-info "Looking for an update for Opera GX..."
-GX_BASE="https://download3.operacdn.com/ftp
+  info "Current Opera Stable version: $current_stable (hash: ${stable_hash:-EMPTY})"
+  info "Current Opera GX version:     $current_gx (hash: ${gx_hash:-EMPTY})"
+
+  if ! is_valid_hash "$stable_hash"; then
+    warn "🚨 Invalid hash detected in one.nix. Forcing update."
+    force_update="true"
+  fi
+  if ! is_valid_hash "$gx_hash"; then
+    warn "🚨 Invalid hash detected in gx.nix. Forcing update."
+    force_update="true"
+  fi
+
+  if [[ "$force_update" == "true" ]]; then
+    info "🔧 Update manually forced."
+    update_needed="true"
+    latest_stable="$current_stable"
+    latest_gx="$current_gx"
+  else
+    latest_stable="$(get_latest_valid_version "$stable_base" "stable" || true)"
+    latest_gx="$(get_latest_valid_version "$gx_base" "gx" || true)"
+
+    if [[ -z "${latest_stable:-}" || -z "${latest_gx:-}" ]]; then
+      echo "Could not determine the latest valid version from the CDN" >&2
+      exit 1
+    fi
+
+    info "Latest valid Stable version: $latest_stable"
+    info "Latest valid GX version:     $latest_gx"
+
+    update_needed=false
+    [[ "$latest_stable" != "$current_stable" ]] && update_needed=true
+    [[ "$latest_gx" != "$current_gx" ]] && update_needed=true
+  fi
+
+  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    {
+      echo "stable_current=$current_stable"
+      echo "stable_latest=$latest_stable"
+      echo "gx_current=$current_gx"
+      echo "gx_latest=$latest_gx"
+      echo "update_needed=$update_needed"
+    } >> "$GITHUB_OUTPUT"
+  fi
+
+  if [[ "$update_needed" != "true" ]]; then
+    info "✅ No version changes"
+    return 0
+  fi
+
+  info "✅ New version or broken hash found: updating .nix files"
+
+  if [[ "$latest_stable" != "$current_stable" || "$force_update" == "true" ]]; then
+    local stable_url="${stable_base}${latest_stable}/linux/opera-stable_${latest_stable}_amd64.deb"
+    local stable_new_hash
+    stable_new_hash="$(get_nix_hash "$stable_url")"
+    update_nix_file "one.nix" "$latest_stable" "$stable_new_hash"
+  fi
+
+  if [[ "$latest_gx" != "$current_gx" || "$force_update" == "true" ]]; then
+    local gx_url="${gx_base}${latest_gx}/linux/opera-gx-stable_${latest_gx}_amd64.deb"
+    local gx_new_hash
+    gx_new_hash="$(get_nix_hash "$gx_url")"
+    update_nix_file "gx.nix" "$latest_gx" "$gx_new_hash"
+  fi
+
+  info "🎉 Update completed."
+}
+
+main "$@"

@@ -2,8 +2,14 @@ name: Update Opera flake
 
 on:
   schedule:
-    - cron: "0 8 * * 1,3,5" # every Monday, Wednesday, Friday at 8:00 UTC
+    - cron: "0 8 * * 1,3,5"
   workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force update (ignore version check)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -19,6 +25,8 @@ jobs:
         run: |
           chmod +x scripts/check-opera-update.sh
           scripts/check-opera-update.sh
+        env:
+          FORCE_UPDATE: ${{ github.event.inputs.force_update || 'false' }}
 
       - name: Run updater
         if: steps.check.outputs.update_needed == 'true'
@@ -29,8 +37,14 @@ jobs:
       - name: Commit
         if: steps.check.outputs.update_needed == 'true'
         run: |
+          if grep -Eq 'hash = ""|hash = "sha256-AAAAAAAA|hash = "null"' one.nix gx.nix; then
+            echo "::error::Invalid hash detected in one.nix or gx.nix. Aborting commit to prevent corruption."
+            exit 1
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
           if [[ -n "$(git status --porcelain)" ]]; then
             git add -A
             git commit -m "chore: update Opera (stable ${{ steps.check.outputs.stable_latest }}, gx ${{ steps.check.outputs.gx_latest }})"
