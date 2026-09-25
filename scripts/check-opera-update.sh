@@ -2,7 +2,7 @@
 set -euo pipefail
 
 info() { echo -e "\e[32m[INFO]\e[0m $*"; }
-warn() { echo -e "\e[33m[WARN]\e[0m $*"; }
+warn() { echo -e "\e[33m[WARN]\e[0m $*" >&2; }
 
 # Extract the version from a .nix file (first occurrence of version = "x.y.z.w";)
 get_current_version_from_nix() {
@@ -25,7 +25,7 @@ get_all_versions() {
 url_exists() {
   local url="$1"
   local status
-  status="$(curl -fsSL -o /dev/null -w "%{http_code}" "$url" || true)"
+  status="$(curl -sSL -o /dev/null -w "%{http_code}" "$url" || true)"
   [[ "$status" == "200" ]]
 }
 
