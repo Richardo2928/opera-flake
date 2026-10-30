@@ -48,12 +48,12 @@
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname = "opera";
-  version = "139.0.6053.15";
+  version = "139.0.6053.22";
 
   src = fetchurl {
     #url = "${"https://get.geo.opera.com/pub/opera/desktop"}/${finalAttrs.version}/linux/opera-stable_${finalAttrs.version}_amd64.deb";
     url = "https://download3.operacdn.com/ftp/pub/opera/desktop/${finalAttrs.version}/linux/opera-stable_${finalAttrs.version}_amd64.deb";
-    hash = "sha256-Pj1OShQ2ctCzZWgiper8ARIO+x5CkOVjONNar+Sjxy8=";
+    hash = "sha256-jgZucfK1OW65zCsxhKwOQU5Bb9O7CTx2qtqJf4yZapk=";
   };
   nativeBuildInputs = [
     dpkg
